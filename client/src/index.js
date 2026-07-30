@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/home.jsx';
 import History from './pages/history.jsx';
 import Policy from './pages/policy.jsx';
+import GameDays from './pages/gameDays.jsx';
+import Tenting from './pages/tenting.jsx';
 import Calendar from './pages/calendar.jsx';
 import FAQs from './pages/faqs.jsx';
 import Contacts from './pages/contacts.jsx';
@@ -36,6 +38,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/history" element={<History />} />
         <Route path="/policy" element={<Policy />} />
+        <Route path="/game-days" element={<GameDays />} />
+        <Route path="/tenting" element={<Tenting />} />
         <Route path="/faqs" element={<FAQs />} />
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/calendar" element={<Calendar />} />

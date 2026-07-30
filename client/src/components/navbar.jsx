@@ -86,6 +86,22 @@ export default function Navbar() {
               Policy
             </NavLink>
             <NavLink
+              to="/game-days"
+              className="nav-link"
+              activeclassname="active"
+              onClick={closeMenu}
+            >
+              Game Days
+            </NavLink>
+            <NavLink
+              to="/tenting"
+              className="nav-link"
+              activeclassname="active"
+              onClick={closeMenu}
+            >
+              Tenting
+            </NavLink>
+            <NavLink
               to="/calendar"
               className="nav-link"
               activeclassname="active"

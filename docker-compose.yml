@@ -5,8 +5,12 @@ services:
     container_name: client
     ports:
       - '3000:3000'
+    environment:
+      - GENERATE_SOURCEMAP=false
+      - DISABLE_ESLINT_PLUGIN=true
     volumes:
       - ./client:/app
+      - /app/node_modules/.cache
       - node-modules-volume-react:/app/node_modules 
     stdin_open: true
     tty: true
