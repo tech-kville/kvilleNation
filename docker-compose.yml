@@ -36,7 +36,7 @@ services:
     container_name: mongo-express
     # restart: always
     ports:
-      - 8081:8081
+      - 5000:5000
     environment:
       ME_CONFIG_MONGODB_ADMINUSER: root
       ME_CONFIG_MONGODB_ADMINPASS: password
