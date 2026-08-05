@@ -59,39 +59,6 @@ function FAQs() {
           ),
         },
         {
-          q: "What is tenting? What are the different levels?",
-          a: (
-            <div>
-              <p>
-                Tenting is the process that students must partake in to earn a spot in Cameron for the UNC game!
-                A tent is composed of 10 to 12 people and there are three different levels of tenting, based on intensity—higher 
-                intensity gets you a better spot. The three periods of tenting are Black, Blue, and White. The requirements are as follows:
-              </p>
-              <p>
-                <strong>Black: 10 tent members in K-Ville at night, 2 during the day</strong>
-              </p>
-              <p>
-                <strong>Blue: 6 tent members in K-Ville at night, 1 during the day</strong>
-              </p>
-              <p>
-                <strong>White: 2 tent members in K-Ville at night, 1 during the day</strong>
-              </p>               
-              <p> 
-                Note that for Black tenting, if more than 80 tents indicate interest, there will be a Duke MBB-related trivia test
-                based on the current season in order to earn a spot in K-Ville. For White tenting, you must earn your spot by participating
-                in a scavenger hunt called Race to the Secret Spots. Further information will be communicated by the Head Line Monitors and 
-                VPs of Tenting during the tenting season. 
-              </p>
-              <p>
-                <strong>
-                For a more detailed description of tenting, please see Section 4 of our{" "}
-                <Link to="/policy">Official Policy</Link>.
-                </strong>
-              </p>
-            </div>
-          ),
-        },
-        {
           q: "What are the different tenting tests and what do they mean?",
           a: (
             <div>
