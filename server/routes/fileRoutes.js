@@ -37,6 +37,59 @@ async function deleteAllByKind(kind) {
   await Promise.all(files.map((f) => bucket.delete(f._id).catch(() => {})));
 }
 
+// Parses a "Range: bytes=start-end" header into { start, end } (both inclusive),
+// clamped to the file size. Returns null if there's no usable range.
+function parseRange(rangeHeader, fileSize) {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader || '');
+  if (!match) return null;
+
+  const [, startStr, endStr] = match;
+  if (startStr === '' && endStr === '') return null;
+
+  let start;
+  let end;
+  if (startStr === '') {
+    // Suffix range, e.g. "bytes=-500" = last 500 bytes
+    const suffixLength = parseInt(endStr, 10);
+    start = Math.max(fileSize - suffixLength, 0);
+    end = fileSize - 1;
+  } else {
+    start = parseInt(startStr, 10);
+    end = endStr === '' ? fileSize - 1 : parseInt(endStr, 10);
+  }
+
+  if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= fileSize) return null;
+  return { start, end: Math.min(end, fileSize - 1) };
+}
+
+// Streams the latest file of `kind` to the response, honoring Range requests so a
+// long PDF (or any large file) can be fetched in chunks instead of start-to-finish
+// every time. Safe to cache aggressively because the URL is cache-busted with
+// ?v=<uploadDate> whenever a new file is uploaded (see the META routes below).
+async function streamLatestByKind(req, res, kind) {
+  const latest = await findLatestByKind(kind);
+  if (!latest) return res.status(404).send(`No ${kind} file`);
+
+  const fileSize = latest.length;
+  const bucket = getBucket();
+
+  res.setHeader('Content-Type', latest.contentType || 'application/pdf');
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.setHeader('Content-Disposition', `inline; filename="${kind}.pdf"`);
+
+  const range = parseRange(req.headers.range, fileSize);
+  if (range) {
+    res.status(206);
+    res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${fileSize}`);
+    res.setHeader('Content-Length', range.end - range.start + 1);
+    return bucket.openDownloadStream(latest._id, { start: range.start, end: range.end + 1 }).pipe(res);
+  }
+
+  res.setHeader('Content-Length', fileSize);
+  return bucket.openDownloadStream(latest._id).pipe(res);
+}
+
 async function uploadNew(kind, file) {
   const bucket = getBucket();
 
@@ -82,20 +135,11 @@ router.get('/policy', async (_req, res) => {
 });
 
 // ------------------- POLICY DOWNLOAD -------------------
-router.get('/policy/download', async (_req, res) => {
+router.get('/policy/download', async (req, res) => {
   try {
-    const latest = await findLatestByKind('policy');
-    if (!latest) return res.status(404).send('No policy file');
-
-    res.setHeader('Content-Type', latest.contentType || 'application/pdf');
-    res.setHeader('Cache-Control', 'no-store');
-    // inline = open in browser; attachment = force download
-    res.setHeader('Content-Disposition', 'inline; filename="policy.pdf"');
-
-    const bucket = getBucket();
-    bucket.openDownloadStream(latest._id).pipe(res);
+    await streamLatestByKind(req, res, 'policy');
   } catch (e) {
-    return res.status(500).send(e.message || 'Failed to download policy');
+    if (!res.headersSent) res.status(500).send(e.message || 'Failed to download policy');
   }
 });
 
@@ -132,19 +176,11 @@ router.get('/calendar', async (_req, res) => {
 });
 
 // ------------------- CALENDAR DOWNLOAD -------------------
-router.get('/calendar/download', async (_req, res) => {
+router.get('/calendar/download', async (req, res) => {
   try {
-    const latest = await findLatestByKind('calendar');
-    if (!latest) return res.status(404).send('No calendar file');
-
-    res.setHeader('Content-Type', latest.contentType || 'application/pdf');
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Disposition', 'inline; filename="calendar.pdf"');
-
-    const bucket = getBucket();
-    bucket.openDownloadStream(latest._id).pipe(res);
+    await streamLatestByKind(req, res, 'calendar');
   } catch (e) {
-    return res.status(500).send(e.message || 'Failed to download calendar');
+    if (!res.headersSent) res.status(500).send(e.message || 'Failed to download calendar');
   }
 });
 

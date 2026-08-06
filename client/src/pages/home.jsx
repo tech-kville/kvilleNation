@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import "../styles/home.css";
-import bannerImage from '../images/kvillenationbanner.png';
+import bannerImage from '../images/kvillenationbanner.webp';
 import InstagramEmbedKvilleNation from '../components/kville_official_ig.jsx';
 import InstagramEmbedDukeMBB from '../components/dukembb_ig.jsx';
 import SpotifyEmbed from '../components/spotifyEmbed.jsx';
