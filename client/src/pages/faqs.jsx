@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from "react-router-dom";
-import kvilleBoundaries from "../images/kvilleboundaries.png"
+import kvilleBoundaries from "../images/kvilleboundaries.webp"
 import '../styles/faqs.css';
 
 function FAQs() {
