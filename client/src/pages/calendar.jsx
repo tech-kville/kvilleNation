@@ -38,7 +38,7 @@ export default function Calendar() {
           <p>Loading…</p>
         ) : url ? (
           <div className="pdf-frame">
-            <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
+            <Worker workerUrl={`${process.env.PUBLIC_URL}/pdfjs/pdf.worker.min.js`}>
               <Viewer
                 fileUrl={url}
                 plugins={[layoutPlugin]}
