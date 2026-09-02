@@ -10,6 +10,7 @@ import CheckStatus from '../lmDashboardComponents/checkStatus.jsx';
 import FileUploadCard from '../lmDashboardComponents/fileUploadCard.jsx';
 import TentLinkForm from '../lmDashboardComponents/tentLink.jsx';
 import SeasonToggle from '../lmDashboardComponents/seasonToggle.jsx';
+import RosterChanges from '../lmDashboardComponents/rosterChanges.jsx';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -102,6 +103,13 @@ export default function LmDashboard() {
       <SearchBox placeholder="Search users..." value={userSearchTerm} onChange={setUserSearchTerm} />
 
       <UsersTable users={filteredUsers} onToggleRole={handleToggleRole} />
+
+      <SectionHeader
+        title="Roster Changes"
+        subtitle="Edits captains made themselves, newest first — already live in Airtable"
+      />
+      <RosterChanges onError={(m) => { setErrorMessage(m); setSuccessMessage(''); }} />
+
       <SectionHeader title="Airtable Settings" subtitle="Rotate keys yearly and update Base/Table IDs" />
       <AirtableConfigForm
         onSuccess={(m) => { setSuccessMessage(m); setErrorMessage(''); }}

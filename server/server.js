@@ -1,11 +1,10 @@
 const express = require('express');
-const axios = require('axios');
 const cors = require('cors');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 require('dotenv').config();
 const UserRoute = require('./routes/userRoutes');
-const { getAirtableConfig } = require('./lib/airtableConfig');
+const { fetchAllTents, patchTent, AirtableConfigError } = require('./lib/airtableTents');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -211,21 +210,15 @@ app.post('/api/tent-checks/update', async (req, res) => {
   if (dateOfLastMiss) fieldsToUpdate['Date of Last Miss'] = dateOfLastMiss;
 
   try {
-    const cfg = await getAirtableConfig();
-    if (!cfg.airtableApiKey || !cfg.airtableBaseId || !cfg.airtableTableId) {
-      return res.status(500).json({ error: 'Airtable config not set' });
-    }
-
-    await axios.patch(
-      `https://api.airtable.com/v0/${cfg.airtableBaseId}/${cfg.airtableTableId}/${id}`,
-      { fields: fieldsToUpdate },
-      { headers: { Authorization: `Bearer ${cfg.airtableApiKey}` } }
-    );
+    await patchTent(id, fieldsToUpdate);
 
     activeTents = activeTents.filter((tent) => tent.id !== id);
     io.emit('tentStatusUpdated', { id });
     return res.status(200).send('Tent data updated successfully');
   } catch (error) {
+    if (error instanceof AirtableConfigError) {
+      return res.status(500).json({ error: 'Airtable config not set' });
+    }
     console.error('Error updating tent data in Airtable:', error.response?.data || error.message);
     return res.status(500).send('Failed to update tent data');
   }
@@ -234,50 +227,11 @@ app.post('/api/tent-checks/update', async (req, res) => {
 // Route to get tent data
 app.get('/api/tent-checks', async (req, res) => {
   try {
-    const cfg = await getAirtableConfig();
-    if (!cfg.airtableApiKey || !cfg.airtableBaseId || !cfg.airtableTableId) {
+    return res.json(await fetchAllTents());
+  } catch (error) {
+    if (error instanceof AirtableConfigError) {
       return res.status(500).json({ error: 'Airtable config not set' });
     }
-
-    let allRecords = [];
-    let offset;
-    do {
-      const config = {
-        headers: { Authorization: `Bearer ${cfg.airtableApiKey}` },
-        params: {},
-      };
-      if (offset) config.params.offset = offset;
-
-      const response = await axios.get(
-        `https://api.airtable.com/v0/${cfg.airtableBaseId}/${cfg.airtableTableId}`,
-        config
-      );
-
-      const { records = [], offset: newOffset } = response.data;
-      allRecords = allRecords.concat(records);
-      offset = newOffset;
-    } while (offset);
-
-    const tents = allRecords.map((record) => ({
-      id: record.id,
-      order: record.fields['Order'] || 0,
-      captain: record.fields['Captain'] || '',
-      captainName: record.fields['Captain Name'] || '',
-      members: record.fields['Members'] || '',
-      name: record.fields['Name'] || '',
-      netIDs: record.fields['netIDs'] || '',
-      type: record.fields['Type'] || '',
-      dayNumber: record.fields['Day Number'] || null,
-      nightNumber: record.fields['Night Number'] || null,
-      numberOfMisses: record.fields['Number of Misses'] || 0,
-      lastCheck: record.fields['Last Check'] || null,
-      dateOfLastCheck: record.fields['Date of Last Check'] || null,
-      lastMissLM: record.fields['Last Miss LM'] || null,
-      dateOfLastMiss: record.fields['Date of Last Miss'] || null,
-    })).sort((a, b) => a.order - b.order);
-
-    return res.json(tents);
-  } catch (error) {
     console.error('Error fetching tent data from Airtable:', error.response?.data || error.message);
     return res.status(500).send('Failed to fetch tent data');
   }
@@ -307,6 +261,7 @@ app.use('/api/airtable-config', require('./routes/airtableConfigRoutes'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // serve files
 app.use('/api/files', require('./routes/fileRoutes'));       
 app.use('/api/tent-link', require('./routes/tentLinkRoutes'));
+app.use('/api/roster', require('./routes/rosterRoutes'));
 app.use('/api/season-status', require('./routes/seasonStatus'));
 
 /**

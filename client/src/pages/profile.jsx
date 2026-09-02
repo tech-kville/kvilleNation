@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import '../styles/profile.css';
 import UserContext from '../userContext.js';
 import { useNavigate } from 'react-router-dom';
+import RosterEditor from '../components/rosterEditor.jsx';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -16,8 +17,10 @@ function Profile() {
 
   // Identity + tent state
   const [netId, setNetId] = useState(user?.netID || null);
-  const [tent, setTent] = useState(null);
+  const [tentInfo, setTentInfo] = useState(null);
   const [tentLoading, setTentLoading] = useState(true);
+
+  const tent = tentInfo?.tent || null;
 
   // Redirect if not authed
   useEffect(() => {
@@ -52,49 +55,39 @@ function Profile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.isAuthenticated, API_BASE_URL]);
 
-  // Load tent by netID
+  // Load the caller's tent. The server resolves which tent is theirs and
+  // whether they may edit it, so the browser never receives every tent's roster.
   useEffect(() => {
-  let cancelled = false;
+    let cancelled = false;
 
-  async function loadTent() {
-    if (!netId) return;
-    try {
-      setTentLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/tent-checks`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      if (!res.ok) throw new Error('Failed to load tent data.');
-      const tents = await res.json();
+    async function loadTent() {
+      if (!netId) return;
+      try {
+        setTentLoading(true);
+        const res = await fetch(`${API_BASE_URL}/api/roster/my-tent`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        if (!res.ok) throw new Error('Failed to load tent data.');
+        const data = await res.json();
 
-      const needle = String(netId).toLowerCase().trim();
-      const boundary = new RegExp(`(^|[^a-z0-9])${needle}([^a-z0-9]|$)`, 'i');
-
-      const found = tents.find((t) => {
-        const haystacks = [
-          t.captainName,  // names
-          t.members,  // names
-          t.netIDs,   // <-- make sure backend sends this
-        ]
-          .filter(Boolean)
-          .map((s) => String(s).toLowerCase());
-
-        return haystacks.some((h) => boundary.test(h));
-      });
-
-      if (!cancelled) setTent(found || null);
-    } catch (err) {
-      console.error('Error loading tent data:', err);
-      if (!cancelled) setTent(null);
-    } finally {
-      if (!cancelled) setTentLoading(false);
+        if (!cancelled) setTentInfo(data);
+      } catch (err) {
+        console.error('Error loading tent data:', err);
+        if (!cancelled) setTentInfo(null);
+      } finally {
+        if (!cancelled) setTentLoading(false);
+      }
     }
-  }
 
-  loadTent();
-  return () => {
-    cancelled = true;
-  };
-}, [netId, API_BASE_URL]);
+    loadTent();
+    return () => {
+      cancelled = true;
+    };
+  }, [netId]);
+
+  // The PATCH response carries the same shape as the GET, so a save just
+  // replaces the whole thing — the UI can never drift from Airtable.
+  const handleRosterSaved = useCallback((updated) => setTentInfo(updated), []);
 
   // Form handlers
   const handleChange = (e) => setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -156,12 +149,6 @@ function Profile() {
       setSuccessMessage('');
     }
   };
-
-  // Helpers
-  const membersArray = (tent?.members || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
 
   return (
   <div className="profile-container">
@@ -226,16 +213,14 @@ function Profile() {
         </div>
       ) : tent ? (
         <div className="tent-body">
-
-          {/* Members */}
-          <div className="members-wrap">
-            <div className="members-title">Team Members</div>
-            <ul className="members-list">
-              {membersArray.map((m, i) => (
-                <li key={i} className="member-chip">{m}</li>
-              ))}
-            </ul>
-          </div>
+          <RosterEditor
+            tent={tent}
+            isCaptain={tentInfo.isCaptain}
+            canEdit={tentInfo.canEdit}
+            reason={tentInfo.reason}
+            editWindow={tentInfo.window}
+            onSaved={handleRosterSaved}
+          />
         </div>
       ) : (
         <div className="tent-empty">

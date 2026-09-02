@@ -442,3 +442,27 @@ table tbody tr:hover {
     width: 100%;
   }
 }
+/* Roster change log */
+
+.roster-change-empty {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.roster-change-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.roster-change-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.roster-change-added   { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.roster-change-removed { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.roster-change-none    { color: #9ca3af; }

@@ -1,0 +1,205 @@
+/* Roster editor — lives inside the tent card on the profile page. */
+
+.roster-editor {
+  margin-top: 1.5rem;
+  text-align: left;
+}
+
+.roster-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 0.25rem;
+}
+
+.roster-count {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+}
+
+.roster-window-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+/* Member rows */
+
+.roster-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roster-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #f3f6fb;
+  border: 1px solid #d8e0f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.roster-name {
+  font-weight: 500;
+  color: #1b1e21;
+  overflow-wrap: anywhere;
+}
+
+.roster-netid {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.roster-locked {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #012169;
+  background: #dde5f5;
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.roster-remove {
+  width: 26px;
+  height: 26px;
+  line-height: 1;
+  font-size: 1.15rem;
+  color: #9ca3af;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.roster-remove:hover,
+.roster-remove:focus-visible {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+/* Add-member form */
+
+.roster-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.roster-add input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 0.95rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.roster-add input:focus-visible {
+  outline: 2px solid #012169;
+  outline-offset: 1px;
+  border-color: #012169;
+}
+
+/* Buttons */
+
+.roster-btn-primary,
+.roster-btn-secondary {
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.roster-btn-primary {
+  color: #fff;
+  background: #012169;
+  border: 1px solid #012169;
+}
+
+.roster-btn-primary:hover:not(:disabled) { background: #001a57; }
+
+.roster-btn-secondary {
+  color: #012169;
+  background: #fff;
+  border: 1px solid #c7d2e8;
+}
+
+.roster-btn-secondary:hover:not(:disabled) { background: #f3f6fb; }
+
+.roster-btn-primary:disabled,
+.roster-btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.roster-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Confirmation panel */
+
+.roster-confirm {
+  margin-top: 0.75rem;
+  padding: 12px 14px;
+  border: 1px solid #d8e0f0;
+  border-radius: 8px;
+  background: #fbfcfe;
+  font-size: 0.92rem;
+}
+
+.roster-confirm p { margin: 0 0 0.5rem; }
+.roster-confirm-title { font-weight: 600; color: #012169; }
+.roster-confirm-note { color: #6b7280; font-size: 0.85rem; }
+
+/* Info boxes — every blocked action and error surfaces through these. */
+
+.roster-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 0.75rem;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 4px solid;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.roster-info-body { flex: 1 1 220px; }
+
+.roster-info a { color: inherit; font-weight: 600; }
+
+.roster-info-info    { background: #eef2fb; border-color: #012169; color: #1f2937; }
+.roster-info-warn    { background: #fff7ed; border-color: #d97706; color: #7c2d12; }
+.roster-info-error   { background: #fef2f2; border-color: #b91c1c; color: #7f1d1d; }
+.roster-info-success { background: #ecfdf5; border-color: #047857; color: #064e3b; }
+
+@media (max-width: 600px) {
+  .roster-row {
+    grid-template-columns: 1fr auto;
+    row-gap: 2px;
+  }
+  .roster-netid { grid-column: 1; grid-row: 2; }
+  .roster-locked,
+  .roster-remove { grid-column: 2; grid-row: 1 / span 2; }
+  .roster-add input { flex-basis: 100%; }
+}
