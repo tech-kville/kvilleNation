@@ -5,11 +5,11 @@ const MongoStore = require('connect-mongo');
 require('dotenv').config();
 const UserRoute = require('./routes/userRoutes');
 const { fetchAllTents, patchTent, AirtableConfigError } = require('./lib/airtableTents');
-const authenticateToken = require('./middleware/authenticateToken');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
+const { isCheckInProgress, setCheckInProgress } = require('./lib/checkState');
 
 mongoose.connect(process.env.MONGO_URL, {
 });
@@ -83,7 +83,6 @@ const io = new Server(server, {
 /** 
  * GLOBAL VARIABLES
  */
-let isCheckInProgress = false;
 let activeTents = [];
 let numCheckers = 1;
 let excludedNames = [];
@@ -95,7 +94,7 @@ let selectedMembers = {};
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
-  if (isCheckInProgress) {
+  if (isCheckInProgress()) {
     socket.emit('checkStarted', {
       activeTents,
       numCheckers,
@@ -121,43 +120,19 @@ io.on('connection', (socket) => {
   });
 });
 
-/** Only Line Monitors and superusers may record a miss or a make. */
-function requireLineMonitor(req, res, next) {
-  if (!req.user?.isLineMonitor && !req.user?.isSuperUser) {
-    return res.status(403).json({ error: 'Line Monitors only' });
-  }
-  next();
-}
-
 /**
  * REST ENDPOINTS
  * We call io.emit(...) to broadcast changes
  */
 
-// Public: the home page shows a tent count to logged-out visitors. It returns
-// a single integer rather than 130 rosters, so /api/tent-checks can stay behind
-// authentication without breaking the public page.
-app.get('/api/tent-count', async (req, res) => {
-  try {
-    const tents = await fetchAllTents();
-    return res.json({ count: tents.length });
-  } catch (error) {
-    if (error instanceof AirtableConfigError) {
-      return res.status(500).json({ error: 'Airtable config not set' });
-    }
-    console.error('Error fetching tent count:', error.response?.data || error.message);
-    return res.status(500).json({ error: 'Failed to fetch tent count' });
-  }
-});
-
 // Route to start check
 app.post('/api/start-check', (req, res) => {
   const { tents, numCheckers: clientNumCheckers } = req.body;
-  if (isCheckInProgress) {
+  if (isCheckInProgress()) {
     return res.status(400).json({ error: 'Check already started' });
   }
 
-  isCheckInProgress = true;
+  setCheckInProgress(true);
   numCheckers = clientNumCheckers || 1;
   const chunkSize = Math.ceil(tents.length / numCheckers);
   let assignedTents = [...tents];
@@ -186,7 +161,7 @@ app.post('/api/start-check', (req, res) => {
 // Route to cancel the check
 app.post('/api/cancel-check', (req, res) => {
   try {
-    isCheckInProgress = false;
+    setCheckInProgress(false);
     activeTents = [];
     numCheckers = 1;
     excludedNames = [];
@@ -206,7 +181,7 @@ app.post('/api/cancel-check', (req, res) => {
 // Route to end the check
 app.post('/api/end-check', (req, res) => {
   try {
-    isCheckInProgress = false;
+    setCheckInProgress(false);
     activeTents = [];
     numCheckers = 1;
     excludedNames = [];
@@ -225,7 +200,7 @@ app.post('/api/end-check', (req, res) => {
 });
 
 // Route to update tent status (Miss or Make)
-app.post('/api/tent-checks/update', authenticateToken, requireLineMonitor, async (req, res) => {
+app.post('/api/tent-checks/update', async (req, res) => {
   const { id, misses, lastCheck, dateOfLastCheck, lastMissLM, dateOfLastMiss } = req.body;
   const fieldsToUpdate = {};
   if (misses !== undefined) fieldsToUpdate['Number of Misses'] = misses;
@@ -250,7 +225,7 @@ app.post('/api/tent-checks/update', authenticateToken, requireLineMonitor, async
 });
 
 // Route to get tent data
-app.get('/api/tent-checks', authenticateToken, async (req, res) => {
+app.get('/api/tent-checks', async (req, res) => {
   try {
     return res.json(await fetchAllTents());
   } catch (error) {
@@ -265,8 +240,8 @@ app.get('/api/tent-checks', authenticateToken, async (req, res) => {
 app.get('/api/check-status', (req, res) => {
   try {
     return res.json({
-      isCheckInProgress,
-      activeTents: isCheckInProgress ? activeTents : [],
+      isCheckInProgress: isCheckInProgress(),
+      activeTents: isCheckInProgress() ? activeTents : [],
     });
   } catch (error) {
     console.error('Error fetching check status:', error.message);

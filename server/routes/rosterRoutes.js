@@ -18,6 +18,7 @@ const {
 const { getEditWindow } = require('../lib/rosterWindow');
 const { diagnoseTent } = require('../lib/tentDiagnostics');
 const { notifyIfBlocked } = require('../lib/blockedTentNotifier');
+const { isCheckInProgress } = require('../lib/checkState');
 
 const CONTACT = 'tenting.kville@gmail.com';
 
@@ -98,6 +99,7 @@ router.get('/my-tent', authenticateToken, async (req, res) => {
 
     const { canEdit, reason, window } = resolvePermission(tent, isCaptain);
     const diagnosis = diagnoseTent(tent);
+    const checkRunning = isCheckInProgress();
 
     // A captain whose stored record is malformed cannot fix it themselves, so
     // tell the VPs the moment they land on the page — they should not have to
@@ -110,8 +112,8 @@ router.get('/my-tent', authenticateToken, async (req, res) => {
     return res.json({
       tent: presentTent(tent),
       isCaptain,
-      canEdit,
-      reason,
+      canEdit: canEdit && !checkRunning,
+      reason: checkRunning && canEdit ? 'check-in-progress' : reason,
       window,
       dataProblem: isCaptain && !diagnosis.ok,
     });
@@ -157,6 +159,15 @@ router.patch('/my-tent', authenticateToken, async (req, res) => {
       return res.status(404).json({
         error: `This tent no longer exists in Airtable. Please email ${CONTACT}.`,
         code: 'tent-missing',
+      });
+    }
+
+    // A roster must not shift under a Line Monitor who is part-way through
+    // checking it, so saves pause for the duration of a check.
+    if (isCheckInProgress()) {
+      return res.status(409).json({
+        error: 'A tent check is in progress. Roster changes are paused until it ends — please try again shortly.',
+        code: 'check-in-progress',
       });
     }
 

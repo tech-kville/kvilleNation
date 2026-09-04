@@ -30,6 +30,7 @@ jest.mock('../../lib/blockedTentNotifier', () => ({
 const airtable = require('../../lib/airtableTents');
 const RosterChange = require('../../models/RosterChange');
 const { notifyIfBlocked } = require('../../lib/blockedTentNotifier');
+const { setCheckInProgress } = require('../../lib/checkState');
 const rosterRoutes = require('../rosterRoutes');
 
 const CAPTAIN = 'jd123';
@@ -75,7 +76,10 @@ afterAll((done) => {
   server.close(done);
 });
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  setCheckInProgress(false);
+});
 
 function tokenFor(netID, extra = {}) {
   return jwt.sign({ netID, firstName: 'Test', lastName: 'User', ...extra }, process.env.JWT_SECRET);
@@ -365,6 +369,66 @@ describe('PATCH /my-tent', () => {
     const res = await call('PATCH', '/api/roster/my-tent', { netID: CAPTAIN, body: { roster: 'nope' } });
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('invalid-roster');
+  });
+});
+
+describe('roster edits pause during a tent check', () => {
+  // A roster must not shift under a Line Monitor mid-check.
+  afterEach(() => setCheckInProgress(false));
+
+  it('reports the roster as locked while a check is running', async () => {
+    airtable.fetchAllTents.mockResolvedValue([makeTent()]);
+    setCheckInProgress(true);
+
+    const res = await call('GET', '/api/roster/my-tent', { netID: CAPTAIN });
+
+    expect(res.body.canEdit).toBe(false);
+    expect(res.body.reason).toBe('check-in-progress');
+  });
+
+  it('refuses a save that lands mid-check, leaving Airtable untouched', async () => {
+    const tent = makeTent();
+    airtable.fetchAllTents.mockResolvedValue([tent]);
+    airtable.fetchTentById.mockResolvedValue(tent);
+    setCheckInProgress(true);
+
+    const res = await call('PATCH', '/api/roster/my-tent', {
+      netID: CAPTAIN,
+      body: savePayload(tent, CURRENT_ROSTER.slice(0, 2)),
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('check-in-progress');
+    expect(airtable.patchTent).not.toHaveBeenCalled();
+  });
+
+  it('allows edits again once the check ends', async () => {
+    const tent = makeTent();
+    airtable.fetchAllTents.mockResolvedValue([tent]);
+    airtable.fetchTentById.mockResolvedValue(tent);
+    airtable.patchTent.mockImplementation(async (id, f) => ({ ...tent, members: f.Members, netIDs: f.netIDs }));
+
+    setCheckInProgress(true);
+    let res = await call('PATCH', '/api/roster/my-tent', {
+      netID: CAPTAIN, body: savePayload(tent, CURRENT_ROSTER.slice(0, 2)),
+    });
+    expect(res.status).toBe(409);
+
+    setCheckInProgress(false);
+    res = await call('PATCH', '/api/roster/my-tent', {
+      netID: CAPTAIN, body: savePayload(tent, CURRENT_ROSTER.slice(0, 2)),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('does not mask a closed window as a check pause', async () => {
+    // A tent that could not edit anyway keeps its real reason.
+    airtable.fetchAllTents.mockResolvedValue([makeTent({ startDate: daysAgo(10) })]);
+    setCheckInProgress(true);
+
+    const res = await call('GET', '/api/roster/my-tent', { netID: CAPTAIN });
+
+    expect(res.body.reason).toBe('window-closed');
   });
 });
 

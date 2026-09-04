@@ -58,6 +58,14 @@ function readOnlyMessage(reason, window) {
           starting {formatWindowDate(window?.opensAt)}.
         </>
       );
+    case 'check-in-progress':
+      return (
+        <>
+          A tent check is happening right now, so roster changes are paused until it
+          finishes. Your roster is locked exactly as a Line Monitor sees it. Check back
+          shortly.
+        </>
+      );
     case 'no-start-date':
       return (
         <>
@@ -194,6 +202,12 @@ export default function RosterEditor({ tent, isCaptain, canEdit, reason, editWin
       });
 
       const data = await response.json().catch(() => ({}));
+
+      if (response.status === 409 && data.code === 'check-in-progress') {
+        setNotice({ tone: 'warn', body: <>{data.error}</> });
+        setConfirming(false);
+        return;
+      }
 
       if (response.status === 409 && data.code === 'data-problem') {
         setNotice({
