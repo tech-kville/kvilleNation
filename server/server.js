@@ -10,8 +10,14 @@ const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const { isCheckInProgress, setCheckInProgress } = require('./lib/checkState');
+const authenticateToken = require('./middleware/authenticateToken');
 
-mongoose.connect(process.env.MONGO_URL, {
+// Without this catch, a failed connection at startup — a DNS blip, Atlas
+// briefly unreachable — takes the whole process down instead of logging and
+// retrying. Mongoose keeps trying in the background, so the API recovers on
+// its own once the database is reachable again.
+mongoose.connect(process.env.MONGO_URL, {}).catch((err) => {
+  console.error('Initial MongoDB connection failed; will keep retrying:', err.message);
 });
 
 mongoose.connection.on('connected', () => {
@@ -121,9 +127,59 @@ io.on('connection', (socket) => {
 });
 
 /**
+ * Tent-check authentication.
+ *
+ * These endpoints were historically open: anyone with the URL could read every
+ * roster or add a miss to any tent. Enforcing that is a breaking change for any
+ * browser still running an older bundle, which mid-season means a Line Monitor
+ * unable to load tents for a check.
+ *
+ * So it ships switched off. With REQUIRE_TENT_CHECK_AUTH unset, unauthenticated
+ * requests are allowed but logged. Watch the logs; once those log lines stop,
+ * every client has the new bundle and the flag can be set to "true" with no
+ * risk to a live check.
+ */
+const ENFORCE_TENT_CHECK_AUTH = process.env.REQUIRE_TENT_CHECK_AUTH === 'true';
+
+function tentCheckAuth(req, res, next) {
+  if (ENFORCE_TENT_CHECK_AUTH) return authenticateToken(req, res, next);
+
+  if (!req.headers.authorization) {
+    console.warn(`[tent-check-auth] unauthenticated ${req.method} ${req.path} — still permitted (REQUIRE_TENT_CHECK_AUTH is off)`);
+    return next();
+  }
+  return authenticateToken(req, res, next);
+}
+
+/** Only Line Monitors and superusers may record a miss or a make. */
+function requireLineMonitor(req, res, next) {
+  if (!ENFORCE_TENT_CHECK_AUTH && !req.user) return next();
+  if (!req.user?.isLineMonitor && !req.user?.isSuperUser) {
+    return res.status(403).json({ error: 'Line Monitors only' });
+  }
+  next();
+}
+
+/**
  * REST ENDPOINTS
  * We call io.emit(...) to broadcast changes
  */
+
+// Public: the home page shows a tent count to logged-out visitors. Returning a
+// single integer rather than 130 rosters lets /api/tent-checks sit behind
+// authentication without breaking the public page.
+app.get('/api/tent-count', async (req, res) => {
+  try {
+    const tents = await fetchAllTents();
+    return res.json({ count: tents.length });
+  } catch (error) {
+    if (error instanceof AirtableConfigError) {
+      return res.status(500).json({ error: 'Airtable config not set' });
+    }
+    console.error('Error fetching tent count:', error.response?.data || error.message);
+    return res.status(500).json({ error: 'Failed to fetch tent count' });
+  }
+});
 
 // Route to start check
 app.post('/api/start-check', (req, res) => {
@@ -200,7 +256,7 @@ app.post('/api/end-check', (req, res) => {
 });
 
 // Route to update tent status (Miss or Make)
-app.post('/api/tent-checks/update', async (req, res) => {
+app.post('/api/tent-checks/update', tentCheckAuth, requireLineMonitor, async (req, res) => {
   const { id, misses, lastCheck, dateOfLastCheck, lastMissLM, dateOfLastMiss } = req.body;
   const fieldsToUpdate = {};
   if (misses !== undefined) fieldsToUpdate['Number of Misses'] = misses;
@@ -225,7 +281,7 @@ app.post('/api/tent-checks/update', async (req, res) => {
 });
 
 // Route to get tent data
-app.get('/api/tent-checks', async (req, res) => {
+app.get('/api/tent-checks', tentCheckAuth, async (req, res) => {
   try {
     return res.json(await fetchAllTents());
   } catch (error) {
