@@ -92,17 +92,14 @@ const Home = () => {
         return;
       }
 
-      // In-season: fetch real tent count
-      const response = await axios.get(`${API_BASE_URL}/api/tent-checks`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      // In-season: fetch the tent count. This is a public endpoint returning
+      // just a number — the home page is visible to logged-out visitors, who
+      // have no token and must not see full rosters.
+      const response = await axios.get(`${API_BASE_URL}/api/tent-count`);
 
       if (cancelled) return; // ignore if effect has been cleaned up
 
-      const tents = response.data;
-      setData((prevData) => ({ ...prevData, numTents: tents.length }));
+      setData((prevData) => ({ ...prevData, numTents: response.data.count }));
     } catch (error) {
       if (!cancelled) {
         console.error('Error fetching tent count:', error);

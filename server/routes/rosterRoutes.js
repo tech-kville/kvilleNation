@@ -16,6 +16,8 @@ const {
   diffRosters,
 } = require('../lib/roster');
 const { getEditWindow } = require('../lib/rosterWindow');
+const { diagnoseTent } = require('../lib/tentDiagnostics');
+const { notifyIfBlocked } = require('../lib/blockedTentNotifier');
 
 const CONTACT = 'tenting.kville@gmail.com';
 
@@ -95,7 +97,24 @@ router.get('/my-tent', authenticateToken, async (req, res) => {
     }
 
     const { canEdit, reason, window } = resolvePermission(tent, isCaptain);
-    return res.json({ tent: presentTent(tent), isCaptain, canEdit, reason, window });
+    const diagnosis = diagnoseTent(tent);
+
+    // A captain whose stored record is malformed cannot fix it themselves, so
+    // tell the VPs the moment they land on the page — they should not have to
+    // report it, and the alert carries detail they could not have provided.
+    // Deliberately not awaited: the page must not wait on SMTP.
+    if (isCaptain && !diagnosis.ok) {
+      notifyIfBlocked(tent, req.user.netID);
+    }
+
+    return res.json({
+      tent: presentTent(tent),
+      isCaptain,
+      canEdit,
+      reason,
+      window,
+      dataProblem: isCaptain && !diagnosis.ok,
+    });
   } catch (error) {
     return handleAirtableError(res, error, 'Error loading tent for roster editor');
   }
@@ -167,6 +186,22 @@ router.patch('/my-tent', authenticateToken, async (req, res) => {
       });
     }
 
+    // Diagnose the STORED record before validating the submission. A captain
+    // whose Airtable row is malformed would otherwise get a validation error
+    // blaming them for a problem they did not cause and cannot fix.
+    const diagnosis = diagnoseTent(current);
+    if (!diagnosis.ok) {
+      notifyIfBlocked(current, req.user.netID);
+      return res.status(409).json({
+        error:
+          `Your tent's roster data needs a fix that only the VPs of Tenting can make. ` +
+          `They have been notified automatically — no need to email, but you can reach ` +
+          `them at ${CONTACT} if it is urgent.`,
+        code: 'data-problem',
+        problems: diagnosis.problems.map((p) => p.message),
+      });
+    }
+
     const nextRoster = roster.map((m) => ({
       name: String(m?.name ?? '').trim(),
       netID: String(m?.netID ?? '').trim(),
@@ -219,6 +254,40 @@ router.patch('/my-tent', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     return handleAirtableError(res, error, 'Error saving roster');
+  }
+});
+
+/**
+ * GET /api/roster/blocked
+ * Every tent whose Airtable record is malformed. Line Monitors only.
+ *
+ * Proactive counterpart to the email alert: rather than waiting for a captain
+ * to trip over a broken record, this scans all of them.
+ */
+router.get('/blocked', authenticateToken, async (req, res) => {
+  if (!req.user.isLineMonitor && !req.user.isSuperUser) {
+    return res.status(403).json({ error: 'Line Monitors only', code: 'forbidden' });
+  }
+
+  try {
+    const tents = await fetchAllTents();
+    const blocked = tents
+      .map((tent) => ({ tent, diagnosis: diagnoseTent(tent) }))
+      .filter(({ diagnosis }) => !diagnosis.ok)
+      .map(({ tent, diagnosis }) => ({
+        id: tent.id,
+        order: tent.order,
+        name: tent.name,
+        type: tent.type,
+        captain: tent.captain,
+        members: tent.members,
+        netIDs: tent.netIDs,
+        problems: diagnosis.problems,
+      }));
+
+    return res.json({ scanned: tents.length, blocked });
+  } catch (error) {
+    return handleAirtableError(res, error, 'Error scanning tents');
   }
 });
 

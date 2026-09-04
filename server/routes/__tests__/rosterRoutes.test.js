@@ -23,8 +23,13 @@ jest.mock('../../lib/airtableTents', () => {
 
 jest.mock('../../models/RosterChange', () => ({ create: jest.fn() }));
 
+jest.mock('../../lib/blockedTentNotifier', () => ({
+  notifyIfBlocked: jest.fn().mockResolvedValue({ notified: true }),
+}));
+
 const airtable = require('../../lib/airtableTents');
 const RosterChange = require('../../models/RosterChange');
+const { notifyIfBlocked } = require('../../lib/blockedTentNotifier');
 const rosterRoutes = require('../rosterRoutes');
 
 const CAPTAIN = 'jd123';
@@ -360,6 +365,61 @@ describe('PATCH /my-tent', () => {
     const res = await call('PATCH', '/api/roster/my-tent', { netID: CAPTAIN, body: { roster: 'nope' } });
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('invalid-roster');
+  });
+});
+
+describe('blocked-tent alerts to the VPs', () => {
+  // "ajc150 acd82" in one slot is the real defect from tent 46 in the live base.
+  const brokenTent = () => makeTent({ members: 'Jane Doe, John Smith', netIDs: 'jd123 js456' });
+
+  it('alerts the VPs when a captain loads a malformed record', async () => {
+    airtable.fetchAllTents.mockResolvedValue([brokenTent()]);
+
+    const res = await call('GET', '/api/roster/my-tent', { netID: CAPTAIN });
+
+    expect(res.body.dataProblem).toBe(true);
+    expect(notifyIfBlocked).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'recTENT1' }),
+      CAPTAIN
+    );
+  });
+
+  it('stays silent for a healthy record', async () => {
+    airtable.fetchAllTents.mockResolvedValue([makeTent()]);
+
+    const res = await call('GET', '/api/roster/my-tent', { netID: CAPTAIN });
+
+    expect(res.body.dataProblem).toBe(false);
+    expect(notifyIfBlocked).not.toHaveBeenCalled();
+  });
+
+  it('does not alert for a non-captain viewing a broken tent', async () => {
+    // Only the captain is blocked from editing, so only they trigger the alert.
+    airtable.fetchAllTents.mockResolvedValue([
+      makeTent({ captain: 'someoneelse', members: 'Jane Doe, John Smith', netIDs: 'jd123 js456' }),
+    ]);
+
+    await call('GET', '/api/roster/my-tent', { netID: CAPTAIN });
+
+    expect(notifyIfBlocked).not.toHaveBeenCalled();
+  });
+
+  it('refuses a save on a malformed record and blames the data, not the captain', async () => {
+    const tent = brokenTent();
+    airtable.fetchAllTents.mockResolvedValue([tent]);
+    airtable.fetchTentById.mockResolvedValue(tent);
+
+    const res = await call('PATCH', '/api/roster/my-tent', {
+      netID: CAPTAIN,
+      body: savePayload(tent, [{ name: 'Jane Doe', netID: 'jd123' }]),
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('data-problem');
+    expect(res.body.error).toContain('VPs of Tenting');
+    expect(res.body.problems.length).toBeGreaterThan(0);
+    expect(notifyIfBlocked).toHaveBeenCalled();
+    expect(airtable.patchTent).not.toHaveBeenCalled();
   });
 });
 

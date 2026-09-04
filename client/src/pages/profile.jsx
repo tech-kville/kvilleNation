@@ -219,6 +219,7 @@ function Profile() {
             canEdit={tentInfo.canEdit}
             reason={tentInfo.reason}
             editWindow={tentInfo.window}
+            dataProblem={tentInfo.dataProblem}
             onSaved={handleRosterSaved}
           />
         </div>

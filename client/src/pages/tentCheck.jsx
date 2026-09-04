@@ -9,6 +9,13 @@ import { flushSync } from 'react-dom';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 const socket = io(API_BASE_URL, { withCredentials: true });
 
+// Tent data and check updates are Line-Monitor-only on the server, so every
+// call from this page has to carry the caller's token.
+const authConfig = () => ({
+  withCredentials: true,
+  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+});
+
 export default function TentCheck() {
   const [tents, setTents] = useState([]);
   const [selectedMembers, setSelectedMembers] = useState({});
@@ -68,9 +75,7 @@ export default function TentCheck() {
     const fetchInitialData = async () => {
       try {
         // fetch all tents
-        const tentsResponse = await axios.get(`${API_BASE_URL}/api/tent-checks`, {
-          withCredentials: true,
-        });
+        const tentsResponse = await axios.get(`${API_BASE_URL}/api/tent-checks`, authConfig());
         const sortedTents = sortTents(tentsResponse.data);
         // check if a check is in progress
         const checkResponse = await axios.get(`${API_BASE_URL}/api/check-status`, {
@@ -178,9 +183,7 @@ export default function TentCheck() {
   
     try {
       setSelectedMembers({});
-      const response = await axios.get(`${API_BASE_URL}/api/tent-checks`, {
-        withCredentials: true,
-      });
+      const response = await axios.get(`${API_BASE_URL}/api/tent-checks`, authConfig());
   
       const sortedTents = sortTents(response.data);
   
@@ -289,7 +292,7 @@ export default function TentCheck() {
             lastMissLM,
             dateOfLastMiss,
           },
-          { withCredentials: true }
+          authConfig()
         );
       }, 500);
     } catch (error) {
@@ -311,7 +314,7 @@ export default function TentCheck() {
             lastCheck: madeMembers.join(', ') || 'No members selected',
             dateOfLastCheck,
           },
-          { withCredentials: true }
+          authConfig()
         );
       }, 500);
     } catch (error) {

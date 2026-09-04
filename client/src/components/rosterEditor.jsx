@@ -79,7 +79,7 @@ function sameRoster(a, b) {
   return a.every((m, i) => m.name === b[i].name && m.netID === b[i].netID);
 }
 
-export default function RosterEditor({ tent, isCaptain, canEdit, reason, editWindow, onSaved }) {
+export default function RosterEditor({ tent, isCaptain, canEdit, reason, editWindow, dataProblem, onSaved }) {
   const savedRoster = useMemo(() => tent?.roster ?? [], [tent]);
 
   const [draft, setDraft] = useState(savedRoster);
@@ -195,6 +195,19 @@ export default function RosterEditor({ tent, isCaptain, canEdit, reason, editWin
 
       const data = await response.json().catch(() => ({}));
 
+      if (response.status === 409 && data.code === 'data-problem') {
+        setNotice({
+          tone: 'warn',
+          body: (
+            <>
+              {data.error}
+            </>
+          ),
+        });
+        setConfirming(false);
+        return;
+      }
+
       if (response.status === 409) {
         setNotice({
           tone: 'warn',
@@ -295,7 +308,15 @@ export default function RosterEditor({ tent, isCaptain, canEdit, reason, editWin
         </ul>
       )}
 
-      {!canEdit && (
+      {dataProblem && (
+        <InfoBox tone="warn">
+          Something in your tent's roster data needs a fix that only the VPs of Tenting
+          can make. They have been notified automatically — you don't need to email.
+          If it's urgent, reach them at <ContactLink />.
+        </InfoBox>
+      )}
+
+      {!canEdit && !dataProblem && (
         <InfoBox tone="info">{readOnlyMessage(isCaptain ? reason : 'not-captain', editWindow)}</InfoBox>
       )}
 

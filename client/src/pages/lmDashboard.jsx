@@ -11,6 +11,7 @@ import FileUploadCard from '../lmDashboardComponents/fileUploadCard.jsx';
 import TentLinkForm from '../lmDashboardComponents/tentLink.jsx';
 import SeasonToggle from '../lmDashboardComponents/seasonToggle.jsx';
 import RosterChanges from '../lmDashboardComponents/rosterChanges.jsx';
+import BlockedTents from '../lmDashboardComponents/blockedTents.jsx';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -103,6 +104,12 @@ export default function LmDashboard() {
       <SearchBox placeholder="Search users..." value={userSearchTerm} onChange={setUserSearchTerm} />
 
       <UsersTable users={filteredUsers} onToggleRole={handleToggleRole} />
+
+      <SectionHeader
+        title="Blocked Tents"
+        subtitle="Airtable records their captain cannot fix — these need a VP"
+      />
+      <BlockedTents onError={(m) => { setErrorMessage(m); setSuccessMessage(''); }} />
 
       <SectionHeader
         title="Roster Changes"

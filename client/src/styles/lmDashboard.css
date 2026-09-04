@@ -466,3 +466,58 @@ table tbody tr:hover {
 .roster-change-added   { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
 .roster-change-removed { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
 .roster-change-none    { color: #9ca3af; }
+
+/* Blocked tents (data problems needing a VP fix) */
+
+.blocked-tent-card {
+  border: 1px solid #fecaca;
+  border-left: 4px solid #b91c1c;
+  border-radius: 8px;
+  background: #fffbfb;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+.blocked-tent-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.blocked-tent-order { font-weight: 700; color: #012169; }
+.blocked-tent-name  { font-weight: 600; }
+.blocked-tent-type,
+.blocked-tent-captain { font-size: 0.82rem; color: #6b7280; }
+
+.blocked-tent-problems {
+  margin: 0 0 8px;
+  padding-left: 20px;
+  font-size: 0.9rem;
+  color: #7f1d1d;
+}
+
+.blocked-tent-problems li { margin-bottom: 3px; }
+
+.blocked-tent-values div {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.82rem;
+  margin-top: 3px;
+}
+
+.blocked-tent-values span {
+  color: #6b7280;
+  min-width: 62px;
+  flex-shrink: 0;
+}
+
+.blocked-tent-values code {
+  background: #f3f4f6;
+  border-radius: 4px;
+  padding: 2px 6px;
+  overflow-wrap: anywhere;
+}
